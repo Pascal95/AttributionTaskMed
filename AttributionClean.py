@@ -95,7 +95,7 @@ def fetch_data(conn):
     taxi = []
     reservation = []
     with conn.cursor() as cursor:
-        querytaxi = f"""SELECT USR_Fiche.idFiche, USR_Fiche.adresse, USR_Fiche.ville, USR_Fiche.codepostal, Vehicule.pecPMR, Disponibilite.HeureDebutMatin, Disponibilite.HeureFinMatin, Disponibilite.HeureDebutApresMidi, Disponibilite.HeureFinApresMidi
+        querytaxi = f"""SELECT USR_Fiche.idFiche, USR_Fiche.mailcontact, USR_Fiche.adresse, USR_Fiche.ville, USR_Fiche.codepostal, Vehicule.pecPMR, Disponibilite.HeureDebutMatin, Disponibilite.HeureFinMatin, Disponibilite.HeureDebutApresMidi, Disponibilite.HeureFinApresMidi
         FROM USR_Fiche 
         INNER JOIN Vehicule ON USR_Fiche.idFiche = Vehicule.idFiche 
         INNER JOIN Disponibilite ON USR_Fiche.idFiche = Disponibilite.idTaxi 
