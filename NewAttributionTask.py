@@ -4,8 +4,26 @@ import locale
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from dotenv import load_dotenv
+import os
+
+# Charger les variables d'environnement
+load_dotenv()
 
 locale.setlocale(locale.LC_TIME, 'fr_FR.UTF-8')
+
+# Paramètres de connexion à la base de données à partir des variables d'environnement
+hostname = os.getenv('DB_HOST')
+database = os.getenv('DB_NAME', 'UperMed')
+username = os.getenv('DB_USER')
+password = os.getenv('DB_PASSWORD')
+port_id = int(os.getenv('DB_PORT', 3306))
+
+# Configuration des paramètres d'email à partir des variables d'environnement
+smtp_user = os.getenv('SMTP_USER')
+smtp_password = os.getenv('SMTP_PASSWORD')
+smtp_host = os.getenv('SMTP_HOST')
+
 jours = [
     (1, "Lundi", 0),
     (2, "Mardi", 1),
@@ -51,8 +69,8 @@ def mettre_a_jour_base_de_donnees(reservations, conn):
         conn.rollback()
         
 def send_email(receiver_email, nom_prenom, adresse_depart, adresse_arrivee, dateheure_consult, pec_pmr):
-    sender_email = "richard.pascalpro@gmail.com"
-    password = "shzw rrnb dcmj mgkl"  # Utilisez des méthodes sécurisées pour gérer ce mot de passe
+    sender_email = smtp_user
+    password = smtp_password  # Utilisez des méthodes sécurisées pour gérer ce mot de passe
     subject = "Nouvelle course attribuée"
 
     # Lecture du template HTML
@@ -79,7 +97,7 @@ def send_email(receiver_email, nom_prenom, adresse_depart, adresse_arrivee, date
     message.attach(MIMEText(html_content, "html"))
 
     try:
-        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+        with smtplib.SMTP(smtp_host, 587) as server:
             server.starttls()
             server.login(sender_email, password)
             text = message.as_string()
@@ -172,13 +190,7 @@ def fetch_data(conn):
     return taxi, reservation
             
 def main():
-    # Paramètres de connexion
-    hostname = '51.178.82.36'
-    database = 'UperMed'
-    username = 'upermed'
-    password = 'hardpassword'
-    port_id = 3306  # Port par défaut pour MySQL
-
+    
     # Établissement de la connexion
     conn = pymysql.connect(
         host=hostname,
