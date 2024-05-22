@@ -1,6 +1,28 @@
 import pymysql
 import datetime
+import locale
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from dotenv import load_dotenv
+import os
 
+# Charger les variables d'environnement
+load_dotenv()
+
+locale.setlocale(locale.LC_TIME, 'fr_FR.UTF-8')
+
+# Paramètres de connexion à la base de données à partir des variables d'environnement
+hostname = os.getenv('DB_HOST')
+database = os.getenv('DB_NAME', 'UperMed')
+username = os.getenv('DB_USER')
+password = os.getenv('DB_PASSWORD')
+port_id = int(os.getenv('DB_PORT', 3306))
+
+# Configuration des paramètres d'email à partir des variables d'environnement
+smtp_user = os.getenv('SMTP_USER')
+smtp_password = os.getenv('SMTP_PASSWORD')
+smtp_host = os.getenv('SMTP_HOST')
 
 jours = [
     (1, "Lundi", 0),
@@ -45,6 +67,46 @@ def mettre_a_jour_base_de_donnees(reservations, conn):
     except Exception as e:
         print(f"Une erreur s'est produite lors de la mise à jour des réservations: {e}")
         conn.rollback()
+        
+def send_email(receiver_email, nom_prenom, adresse_depart, adresse_arrivee, dateheure_consult, pec_pmr):
+    sender_email = smtp_user
+    password = smtp_password  # Utilisez des méthodes sécurisées pour gérer ce mot de passe
+    subject = "Nouvelle course attribuée"
+
+    # Lecture du template HTML
+    with open("template.html", "r") as file:
+        html_template = file.read()
+
+    # Remplacement des placeholders dans le template
+    html_content = html_template.replace("[OBJET]", subject)
+    html_content = html_content.replace("[NOM]", nom_prenom)
+    message_details = f"""
+    Une nouvelle course a été attribuée avec les détails suivants:</br>
+    - Adresse de départ: {adresse_depart}</br>
+    - Adresse d'arrivée: {adresse_arrivee}</br>
+    - Date et heure de la course: {dateheure_consult}</br>
+    - Assistance PMR nécessaire: {'Oui' if pec_pmr else 'Non'}</br>
+    """
+    html_content = html_content.replace("[MESSAGE]", message_details)
+
+    # Préparation de l'e-mail
+    message = MIMEMultipart()
+    message["From"] = sender_email
+    message["To"] = receiver_email
+    message["Subject"] = subject
+    message.attach(MIMEText(html_content, "html"))
+
+    try:
+        with smtplib.SMTP(smtp_host, 587) as server:
+            server.starttls()
+            server.login(sender_email, password)
+            text = message.as_string()
+            server.sendmail(sender_email, receiver_email, text)
+        print("Email envoyé avec succès !")
+    except Exception as e:
+        print(f"Erreur lors de l'envoi de l'email : {e}")
+
+
 # Utilisation de la fonction pour ajuster le calcul de fin_prevue
 def attribuer_taxis(taxis, reservations, jour_attribution):
 
@@ -87,6 +149,17 @@ def attribuer_taxis(taxis, reservations, jour_attribution):
 
         if taxis_disponibles:
             reservation['idTaxi'] = taxis_disponibles[0]['idFiche']
+            nom = taxis_disponibles[0]['nom'] + " " + taxis_disponibles[0]['prenom']
+            # Formater la date en français
+            date_francaise = reservation['HeureConsult'].strftime('%A %d %B %Y à %H:%M')
+            send_email(
+                receiver_email = taxis_disponibles[0]['mailcontact'], 
+                nom_prenom = nom, 
+                adresse_depart = reservation['AdresseDepart'], 
+                adresse_arrivee = reservation['AdresseArrive'], 
+                dateheure_consult = date_francaise, 
+                pec_pmr = reservation['pecPMR']
+            )
             print(f"Taxi {taxis_disponibles[0]['idFiche']} attribué à la réservation.")
         else:
             print("Aucun taxi disponible pour cette réservation.")
@@ -95,7 +168,7 @@ def fetch_data(conn):
     taxi = []
     reservation = []
     with conn.cursor() as cursor:
-        querytaxi = f"""SELECT USR_Fiche.idFiche, USR_Fiche.mailcontact, USR_Fiche.adresse, USR_Fiche.ville, USR_Fiche.codepostal, Vehicule.pecPMR, Disponibilite.HeureDebutMatin, Disponibilite.HeureFinMatin, Disponibilite.HeureDebutApresMidi, Disponibilite.HeureFinApresMidi
+        querytaxi = f"""SELECT USR_Fiche.idFiche,USR_Fiche.nom, USR_Fiche.prenom, USR_Fiche.mailcontact, USR_Fiche.adresse, USR_Fiche.ville, USR_Fiche.codepostal, Vehicule.pecPMR, Disponibilite.HeureDebutMatin, Disponibilite.HeureFinMatin, Disponibilite.HeureDebutApresMidi, Disponibilite.HeureFinApresMidi
         FROM USR_Fiche 
         INNER JOIN Vehicule ON USR_Fiche.idFiche = Vehicule.idFiche 
         INNER JOIN Disponibilite ON USR_Fiche.idFiche = Disponibilite.idTaxi 
@@ -117,13 +190,7 @@ def fetch_data(conn):
     return taxi, reservation
             
 def main():
-    # Paramètres de connexion
-    hostname = '51.178.82.36'
-    database = 'UperMed'
-    username = 'upermed'
-    password = 'hardpassword'
-    port_id = 3306  # Port par défaut pour MySQL
-
+    
     # Établissement de la connexion
     conn = pymysql.connect(
         host=hostname,
@@ -146,3 +213,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
