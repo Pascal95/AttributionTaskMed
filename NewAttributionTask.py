@@ -73,8 +73,14 @@ def send_email(receiver_email, nom_prenom, adresse_depart, adresse_arrivee, date
     password = smtp_password  # Utilisez des méthodes sécurisées pour gérer ce mot de passe
     subject = "Nouvelle course attribuée"
 
+    # Obtenir le chemin absolu du répertoire où se trouve le script
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+
+    # Construire le chemin absolu vers template.html
+    template_path = os.path.join(script_dir, 'template.html')
+    
     # Lecture du template HTML
-    with open("template.html", "r") as file:
+    with open(template_path, "r") as file:
         html_template = file.read()
 
     # Remplacement des placeholders dans le template
