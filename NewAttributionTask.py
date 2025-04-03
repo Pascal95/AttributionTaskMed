@@ -33,10 +33,11 @@ jours = [
     (6, "Samedi", 5),
     (7, "Dimanche", 6)
 ]
-jour_attribution = datetime.datetime.now() + datetime.timedelta(days=2)
+jour_attribution = datetime.datetime.now() + datetime.timedelta(days=1)
 jour_attribution = jour_attribution.date()
 jour_formattee = jour_attribution.isoformat()
 indice_python = jour_attribution.weekday()
+print(jour_attribution)
 id_jour_db = next(jour[0] for jour in jours if jour[2] == indice_python)
 # Fonction pour mettre à jour les taxis attribués et gérer les réservations sans taxi
 def mettre_a_jour_base_de_donnees(reservations, conn):
@@ -117,10 +118,14 @@ def send_email(receiver_email, nom_prenom, adresse_depart, adresse_arrivee, date
 def attribuer_taxis(taxis, reservations, jour_attribution):
 
     for reservation in reservations:
-        taxis_compatibles = [
-            t for t in taxis if (t['pecPMR'] == 'Oui' or not reservation['pecPMR'])
-        ]
+        if reservation['pecPMR']:
+            # Filtrer les taxis compatibles avec PMR
+            taxis_compatibles = [t for t in taxis if t['pecPMR'] == 'Oui']
+        else:
+            # Tous les taxis sont compatibles
+            taxis_compatibles = taxis
 
+        taxis_compatibles.sort(key=lambda x: (x['nombre_courses'], x['duree_totale']))
         taxis_disponibles = []
         for taxi in taxis_compatibles:
             chevauchement = False
@@ -144,7 +149,7 @@ def attribuer_taxis(taxis, reservations, jour_attribution):
                 # Supposons qu'il n'y a pas encore de taxi attribué pour simplifier
                 for r in [res for res in reservations if res.get('idTaxi') == taxi['idFiche']]:
                     # Calculer la fin prévue
-                    fin_prevue = r['HeureDepart'] + r['DureeTrajet'] + datetime.timedelta(hours=1)  # Ajouter la pause
+                    fin_prevue = r['HeureDepart'] + r['DureeTrajet'] + datetime.timedelta(minutes=30)  # Ajouter la pause
                     if heure_depart < fin_prevue:
                         chevauchement = True
                         print(f"Chevauchement détecté pour taxi {taxi['idFiche']}")
@@ -155,6 +160,8 @@ def attribuer_taxis(taxis, reservations, jour_attribution):
 
         if taxis_disponibles:
             reservation['idTaxi'] = taxis_disponibles[0]['idFiche']
+            taxis_disponibles[0]['nombre_courses'] += 1
+            taxis_disponibles[0]['duree_totale'] += reservation['DureeTrajet'].total_seconds() / 3600
             nom = taxis_disponibles[0]['nom'] + " " + taxis_disponibles[0]['prenom']
             # Formater la date en français
             date_francaise = reservation['HeureConsult'].strftime('%A %d %B %Y à %H:%M')
@@ -184,9 +191,12 @@ def fetch_data(conn):
         rows = cursor.fetchall()
         for row in rows:
             record = dict(zip(columns, row))
+            record['nombre_courses'] = 0 
+            record['duree_totale'] = 0.0 
             taxi.append(record)
 
-        queryreservation = f"SELECT * FROM Reservation WHERE Reservation.Etat = 2 AND DATE(Reservation.HeureConsult) = '{jour_formattee}'"
+        queryreservation = f"SELECT * FROM Reservation WHERE Reservation.Etat = 2"
+        #queryreservation = f"SELECT * FROM Reservation WHERE Reservation.Etat = 2 AND DATE(Reservation.HeureConsult) = '{jour_formattee}'"
         cursor.execute(queryreservation)
         columns = [col[0] for col in cursor.description]
         rows = cursor.fetchall()
