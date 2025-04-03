@@ -43,7 +43,7 @@ def mettre_a_jour_base_de_donnees(reservations, conn):
     try:
         with conn.cursor() as cursor:
             for reservation in reservations:
-                if 'idTaxi' in reservation and reservation['idTaxi'] > 0:
+                if reservation.get('idTaxi') is not None and reservation['idTaxi'] > 0:
                     # Mise à jour de la réservation avec l'ID du taxi attribué
                     update_query = """
                     UPDATE Reservation
